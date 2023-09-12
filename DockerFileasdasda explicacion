@@ -1,0 +1,33 @@
+FROM node:18-alpine3.15
+
+# Set working directory
+#Aca estoy creando una carpeta con el mkdir que es un comando de linux , solo podemos interactuar con el mediante comandos, alpine es una version de linux que pesa 
+# 6 megas, y el working directory estoy especificando la ruta que esta en WORKDIR
+RUN mkdir -p /var/www/pokedex
+WORKDIR /var/www/pokedex
+
+# Copiar el directorio y su contenido
+#aca le digo que copie todo el directorio (el origen) y la sgunda parte es el destino, copia a ese destino ,osea led igo copia todo lo q esta en el root del a aplicacion
+# por eso es le . , es todo lo q tengo al rededor, en la raiz, y el segundo ./var/www/pokedex a donde va a ir copiado , el ultimo es el path del destino
+#despide pide q instale todas lasd ependeicias que son de produccion y luego hacer el build 
+COPY . ./var/www/pokedex
+COPY package.json tsconfig.json tsconfig.build.json /var/www/pokedex/
+RUN yarn install --prod
+RUN yarn build
+#el yarn build esta definido en el package.json y basicamente, esta ejecutando el nest build (el script qeue construye la aplicacion , la carpeta de distribucion)
+#para indicarle a algunos le voy a indicar con el docker ignore q no quiero algunos archivos , en el docker ignore an los archivos que noq uiero cpiar con el COPY
+
+
+# Dar permiso para ejecutar la applicación
+# crear un nuevousaurio para no usar el usuario root que viene por defecot con las iamgenes, se crea un nuevo usuario y se le deshabilita la password ,
+#y sel e da acceso al usuario solamente a ese directorio( es para entrar a la imagen de linux )
+RUN adduser --disabled-password pokeuser
+RUN chown -R pokeuser:pokeuser /var/www/pokedex
+USER pokeuser
+
+# Limpiar el caché
+RUN yarn cache clean --force
+
+EXPOSE 3000
+
+CMD [ "yarn","start" ]

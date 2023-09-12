@@ -1,0 +1,54 @@
+# Install dependencies only when needed
+FROM node:18-alpine3.15 AS deps
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+#Esto es para crear la iamgen ,montando imagen de node18, poniendol el nombre de deps,  
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+COPY package.json yarn.lock ./
+#aca los copio y los pego, solo el package.json y el yarn.lock , lo muevo al nuevo contenedor y haog la instanlacion de los modulos de node ahi,
+#de esa manera tengo en cache esas dependencias, y solo si cambian se instalan las nuevas dependencias, todo el procedimiento se llama deps por eso el AS
+RUN yarn install --frozen-lockfile
+
+
+# Build the app with cache dependencies
+#esta se llama builder, aca copia del appnodemodules, copia  de deps y los pega en el contenedor de builder, 
+#si no cambiaron instaneamente los mueve porque estan e ncache , luiego los copia y los pega en el directorio, por eso
+#el copy . . xsq ya estoy en el working directory
+FROM node:18-alpine3.15 AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+#hace el build de produccion
+RUN yarn build
+
+
+# Production image, copy all the files and run next
+FROM node:18-alpine3.15 AS runner
+#el runner es quien corre la aplicacion propiamente, aca crea una nueva imagen basado en node alpine, creo el working directory usr/src/app
+# copio el package json y el yarnlock y luego es ad onde quiero que caigan los archivos q es le contenedor ./ por eso esta asi escrito ,y luego hago la instalacion  
+#
+
+# Set working directory
+WORKDIR /usr/src/app
+
+COPY package.json yarn.lock ./
+
+RUN yarn install --prod
+
+COPY --from=builder /app/dist ./dist
+
+# # Copiar el directorio y su contenido
+# RUN mkdir -p ./pokedex
+
+# COPY --from=builder ./app/dist/ ./app
+# COPY ./.env ./app/.env
+
+# # Dar permiso para ejecutar la applicación
+# RUN adduser --disabled-password pokeuser
+# RUN chown -R pokeuser:pokeuser ./pokedex
+# USER pokeuser
+
+# EXPOSE 3000
+
+CMD [ "node","dist/main" ]
+#ejecuta el archivo que esta en dist/main que seria el main.js
